@@ -108,11 +108,14 @@ def parse_msa(doc_path: str, pages: list[str]) -> Optional[ContractMeta]:
         lf_compounds = False
 
     # Volume rebate
-    m_reb = re.search(r"7\.1\s+Volume rebate\.\s+([^\n]+(?:\n[^\n]+)?)", full_text)
+    m_reb = re.search(r"7\.1\s+Volume rebate\.\s+([^\n]+(?:\n[^\n]+){1,3})", full_text)
     reb_tiers = []
     reb_quote = ""
     if m_reb:
-        reb_quote = m_reb.group(0)
+        raw_reb = m_reb.group(0).replace("\n", " ").strip()
+        if "7.2" in raw_reb:
+            raw_reb = raw_reb[: raw_reb.index("7.2")].strip()
+        reb_quote = raw_reb
         # QS >= USD 55,000.00: 5%; QS >= USD 91,000.00: 7.5%; QS >= USD 150,000.00: 10%
         # or INR tiers
         tier_matches = re.findall(r"QS\s*>=\s*(?:USD|INR)\s*([\d,]+\.?\d*)\s*:\s*([\d.]+)%", reb_quote)
@@ -123,8 +126,13 @@ def parse_msa(doc_path: str, pages: list[str]) -> Optional[ContractMeta]:
         reb_tiers.sort(key=lambda t: t[0])
 
     # Qualifying spend
-    m_qs = re.search(r"1\.1\s+Qualifying Spend\.\s+([^\n]+(?:\n[^\n]+)?)", full_text)
-    qs_quote = m_qs.group(0) if m_qs else ""
+    m_qs = re.search(r"1\.1\s+Qualifying Spend\.\s+([^\n]+(?:\n[^\n]+){1,5})", full_text)
+    qs_quote = ""
+    if m_qs:
+        raw_qs = m_qs.group(0).replace("\n", " ").strip()
+        if "1.2" in raw_qs:
+            raw_qs = raw_qs[: raw_qs.index("1.2")].strip()
+        qs_quote = raw_qs
 
     # Schedule 1 Contacts
     contacts_dict = {}
