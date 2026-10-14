@@ -58,6 +58,10 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
     """Parse invoice from PDF pages or statement XLSX pages."""
     full_text = "\n".join(pages)
 
+    # Exclude MSAs and Amendments
+    if "Master Services Agreement" in full_text or "Amendment No." in full_text or "MSA-" in doc_path or "AMD-" in doc_path:
+        return None
+
     # Detect if this is an invoice or statement
     is_inv = bool(
         re.search(r"INVOICE|Charges\s+advice|STATEMENT\s+OF\s+ACCOUNT", full_text, re.I)
