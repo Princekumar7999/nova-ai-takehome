@@ -449,7 +449,7 @@
        "step": "ingest",
        "rc": 0,
        "stderr": "",
-       "secs": 1.8
+       "secs": 2.0
       },
       {
        "step": "report",
@@ -461,7 +461,7 @@
        "step": "feedback",
        "rc": 0,
        "stderr": "",
-       "secs": 0.2
+       "secs": 0.3
       }
      ],
      "items": 8
@@ -475,13 +475,13 @@
        "step": "ingest",
        "rc": 0,
        "stderr": "",
-       "secs": 7.0
+       "secs": 8.0
       },
       {
        "step": "report",
        "rc": 0,
        "stderr": "",
-       "secs": 0.3
+       "secs": 0.4
       }
      ],
      "items": 22
@@ -499,7 +499,7 @@
        "step": "ingest",
        "rc": 0,
        "stderr": "",
-       "secs": 1.5
+       "secs": 1.9
       },
       {
        "step": "report",
@@ -525,13 +525,13 @@
        "step": "ingest",
        "rc": 0,
        "stderr": "",
-       "secs": 6.9
+       "secs": 7.6
       },
       {
        "step": "report",
        "rc": 0,
        "stderr": "",
-       "secs": 0.3
+       "secs": 0.4
       }
      ],
      "items": 22
