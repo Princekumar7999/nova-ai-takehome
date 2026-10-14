@@ -143,9 +143,15 @@ def parse_msa(doc_path: str, pages: list[str]) -> Optional[ContractMeta]:
     annex_d_accessorials = {}
     annex_e_codes = {}
     annex_f_fx = {}
+    period_2_start = ""
 
     for page_idx, page_text in enumerate(pages):
         page_num = page_idx + 1
+
+        # Period 2 start
+        m_p2 = re.search(r"Period P2:\s*pickups\s*(\d{4}-\d{2}-\d{2})\s*to", page_text)
+        if m_p2:
+            period_2_start = m_p2.group(1)
 
         # Schedule 1
         if "Schedule 1:" in page_text:
@@ -292,6 +298,7 @@ def parse_msa(doc_path: str, pages: list[str]) -> Optional[ContractMeta]:
         annex_d_accessorials=annex_d_accessorials,
         annex_e_codes=annex_e_codes,
         annex_f_fx=annex_f_fx,
+        period_2_start=period_2_start,
     )
 
 

@@ -193,6 +193,7 @@ class ContractMeta:
     annex_d_accessorials: dict[str, Decimal] = field(default_factory=dict)
     annex_e_codes: dict[str, list[str]] = field(default_factory=dict)
     annex_f_fx: dict[str, AnnexFRow] = field(default_factory=dict)
+    period_2_start: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -222,6 +223,7 @@ class ContractMeta:
             "annex_d_accessorials": {k: str(v) for k, v in self.annex_d_accessorials.items()},
             "annex_e_codes": self.annex_e_codes,
             "annex_f_fx": {k: v.to_dict() for k, v in self.annex_f_fx.items()},
+            "period_2_start": self.period_2_start,
         }
 
     @classmethod
@@ -248,8 +250,8 @@ class ContractMeta:
             late_fee_grace_days=int(d["late_fee_grace_days"]),
             late_fee_compounds=bool(d["late_fee_compounds"]),
             volume_rebate_tiers=tiers,
-            qualifying_spend_definition=str(d.get("qualifying_spend_definition", "")),
-            source_doc=str(d.get("source_doc", "")),
+            qualifying_spend_definition=str(d.get("qualifying_spend_definition", "base_freight")),
+            source_doc=str(d["source_doc"]),
             term_quote=str(d.get("term_quote", "")),
             late_fee_quote=str(d.get("late_fee_quote", "")),
             rebate_quote=str(d.get("rebate_quote", "")),
@@ -261,6 +263,7 @@ class ContractMeta:
             annex_d_accessorials=acc,
             annex_e_codes=d.get("annex_e_codes", {}),
             annex_f_fx=fx,
+            period_2_start=str(d.get("period_2_start", "")),
         )
 
 

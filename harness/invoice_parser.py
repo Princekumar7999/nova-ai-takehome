@@ -75,10 +75,13 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
 
     # Invoice ID
     m_id = re.search(
-        r"(?:INVOICE|Charges\s+advice|STATEMENT\s+OF\s+ACCOUNT)\s+([A-Z0-9/\-:#]+)", full_text, re.I
+        r"(?:Freight\s+bill\s+no\.|Tax\s+invoice\s+no\.|INVOICE|Charges\s+advice|STATEMENT\s+OF\s+ACCOUNT|Invoice\s+no\.|Bill\s+no\.)\s*[:.]?\s*([A-Z0-9/\-:#]+)",
+        full_text,
+        re.I,
     )
     if not m_id:
-        m_id = re.search(r"([A-Z0-9]+(?:/[A-Z0-9\-]+|-[A-Z0-9\-]+)+)", doc_path)
+        fname = doc_path.split("#")[-1].replace(".pdf", "").replace(".xlsx", "")
+        m_id = re.search(r"([A-Z0-9]+(?:/[A-Z0-9\-]+|-[A-Z0-9\-]+)+)", fname)
     if not m_id:
         return None
     raw_id = m_id.group(1).strip()
@@ -89,25 +92,25 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
     due_date = None
 
     # Tarrowby format: Invoice date 2035-03-03 Due date 2035-04-17
-    # Or Statement date 2034-12-01 | Due date 2035-01-15
+    # Or Freight bill format: Issued on 25 Aug 2035 Settle by 09 Oct 2035
     m_dates = re.search(
-        r"(?:Invoice\s+date|Statement\s+date|Document\s+date)\s+([\d/\-]+)[^\w\n]+(?:Due\s+date|Payable\s+by)\s+([\d/\-]+)",
+        r"(?:Invoice\s+date|Statement\s+date|Document\s+date|Issued\s+on)\s+([\d\w/\-\s]+?)\s+(?:Due\s+date|Payable\s+by|Settle\s+by)\s+([\d\w/\-\s]+?)(?:\n|$)",
         full_text,
         re.I,
     )
     if m_dates:
-        inv_date = parse_date_str(m_dates.group(1))
-        due_date = parse_date_str(m_dates.group(2))
+        inv_date = parse_date_str(m_dates.group(1).strip())
+        due_date = parse_date_str(m_dates.group(2).strip())
     else:
-        m_idate = re.search(r"(?:Invoice|Statement|Document)\s+date\s+([\d/\-]+)", full_text, re.I)
+        m_idate = re.search(r"(?:Invoice|Statement|Document|Issued\s+on)\s+date\s*[:.]?\s*([\d\w/\-\s]+)", full_text, re.I)
         if m_idate:
-            inv_date = parse_date_str(m_idate.group(1))
-        m_ddate = re.search(r"(?:Due\s+date|Payable\s+by)\s+([\d/\-]+)", full_text, re.I)
+            inv_date = parse_date_str(m_idate.group(1).strip())
+        m_ddate = re.search(r"(?:Due\s+date|Payable\s+by|Settle\s+by)\s*[:.]?\s*([\d\w/\-\s]+)", full_text, re.I)
         if m_ddate:
-            due_date = parse_date_str(m_ddate.group(1))
+            due_date = parse_date_str(m_ddate.group(1).strip())
 
     # Contract ID
-    m_cid = re.search(r"Contract(?:\s+reference)?\s+([A-Z0-9\-]+)", full_text, re.I)
+    m_cid = re.search(r"(?:Contract(?:\s+reference)?|Service\s+agreement)\s+([A-Z0-9\-]+)", full_text, re.I)
     contract_id = m_cid.group(1).strip() if m_cid else ""
 
     # Currency
@@ -123,14 +126,14 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
     elif "Ferrowyn Life Sciences" in full_text:
         customer_party = "FWN"
 
-    if "Tarrowby Express" in full_text or "TBX" in contract_id or "TX-" in inv_id:
+    if "Tarrowby Express" in full_text or "TBX" in contract_id or "TX-" in inv_id or "TXI" in inv_id:
         carrier_party = "TBX"
     elif "Caldrith Air" in full_text or "CDA" in contract_id or "CDU-" in inv_id or "CDI-" in inv_id:
         carrier_party = "CDA"
 
     # Total billed
     m_tot = re.search(
-        r"(?:Total\s+payable|Total\s+USD|Total\s+INR|Total)\s+(?:USD|INR|[\$₹])?\s*\|?\s*([\d,]+\.\d{2})",
+        r"(?:Total\s+payable|Total\s+USD|Total\s+INR|Total|Balance\s+due)\s+(?:USD|INR|[\$₹])?\s*\|?\s*([\d,]+\.\d{2})",
         full_text,
         re.I,
     )
@@ -142,13 +145,12 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
     for page_idx, page_text in enumerate(pages):
         for line_raw in page_text.splitlines():
             line_str = line_raw.strip()
-            if not line_str or line_str.startswith("No.") or line_str.startswith("Route"):
+            if not line_str or line_str.startswith("No.") or line_str.startswith("Route") or line_str.startswith("Charge Shipment"):
                 continue
 
             # Format 1: Tarrowby PDF invoice line
             # 1 TX64694457 2035-02-24 Air freight USS2-INW2 192 kg 2.84 545.28
-            # or Late fee: 13 - - Late fee on TX-US-2032-5494: USD 680.12 overdue, month 1 @ 1.86% - 1 month 1.86% 12.65
-            # or Screening fee (adj.) (ref TE16812897) USC3-USE2 263 kg 0.16 42.08
+            # or 5 TX64694457 2035-02-24 DG handling USS2-INW2 1 shpt 124.02 124.02
             m_tarr = re.match(
                 r"^(\d+)\s+([A-Z0-9\-]+)\s+([\d/\-]+)\s+(.+?)\s+([A-Z0-9]+-[A-Z0-9]+)\s+(.+?)\s+([\d,]+\.\d{2})$",
                 line_str,
@@ -162,8 +164,6 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
                 middle = m_tarr.group(6).strip()
                 amt = parse_money(m_tarr.group(7)) or Decimal("0")
 
-                # parse weight & rate from middle if present
-                # middle could be: "192 kg 2.84" or "545.28 20.53%" or "1 shpt 116.13"
                 weight = None
                 rate = None
                 m_w = re.search(r"([\d.]+)\s*kg", middle)
@@ -188,7 +188,80 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
                 )
                 continue
 
-            # Format 2: Caldrith PDF invoice line
+            # Format 2: Freight bill format
+            # Air freight TX16988854 USS2-INN1 21 Jun 2035 889.34 106 kg 8.39
+            # Fuel surcharge TX16988854 USS2-INN1 21 Jun 2035 218.24 889.34 24.54%
+            # Security surcharge TX16988854 USS2-INN1 21 Jun 2035 12.72 106 kg 0.12
+            # Delivery fee TX16988854 USS2-INN1 21 Jun 2035 116.13 1 shpt 116.13
+            # Dry ice handling fee TX45954367 USS2-INW2 31 Jul 2035 45.40 1 shpt 45.40
+            m_fb = re.match(
+                r"^([A-Za-z\s]+?)\s+([A-Z0-9\-]+)\s+([A-Z0-9]+-[A-Z0-9]+)\s+([\d]+\s+[A-Za-z]{3}\s+[\d]{4}|[\d/\-]+)\s+([\d,]+\.\d{2})\s*(.*)$",
+                line_str,
+            )
+            if m_fb and not line_str.startswith("Late fee"):
+                desc = m_fb.group(1).strip()
+                awb = m_fb.group(2).strip()
+                lane = m_fb.group(3).strip()
+                l_date = parse_date_str(m_fb.group(4).strip()) or (inv_date or "")
+                amt = parse_money(m_fb.group(5)) or Decimal("0")
+                tail = m_fb.group(6).strip()
+
+                weight = None
+                rate = None
+                m_w = re.search(r"([\d.]+)\s*kg", tail)
+                if m_w:
+                    weight = Decimal(m_w.group(1))
+                rates = re.findall(r"([\d.]+)", tail)
+                if rates:
+                    rate = Decimal(rates[-1])
+
+                lines.append(
+                    InvoiceLine(
+                        line_no=len(lines) + 1,
+                        awb=awb,
+                        date_str=l_date,
+                        charge_name=desc,
+                        lane=lane,
+                        chargeable_weight_kg=weight,
+                        rate_billed=rate,
+                        amount_billed=amt,
+                        raw_line=line_str,
+                    )
+                )
+                continue
+
+            # Format 3: Indian INR format
+            # TX15472186 Air freight 2035-08-13 INN3-USC3 996531 396 kg 584.72 231549.12
+            # TX15472186 Fuel surcharge 2035-08-13 INN3-USC3 996531 231549.12 17.06% 39502.28
+            m_inr = re.match(
+                r"^([A-Z0-9\-]+)\s+([A-Za-z\s]+?)\s+([\d/\-]+)\s+([A-Z0-9]+-[A-Z0-9]+)\s+\d+\s+(?:([\d.]+)\s*kg\s+([\d.]+)|[\d.]+\s+[\d.]+%|1\s+shpt\s+[\d.]+)\s+([\d,]+\.\d{2})$",
+                line_str,
+            )
+            if m_inr:
+                awb = m_inr.group(1).strip()
+                desc = m_inr.group(2).strip()
+                l_date = parse_date_str(m_inr.group(3)) or (inv_date or "")
+                lane = m_inr.group(4).strip()
+                weight = Decimal(m_inr.group(5)) if m_inr.group(5) else None
+                rate = Decimal(m_inr.group(6)) if m_inr.group(6) else None
+                amt = parse_money(m_inr.group(7)) or Decimal("0")
+
+                lines.append(
+                    InvoiceLine(
+                        line_no=len(lines) + 1,
+                        awb=awb,
+                        date_str=l_date,
+                        charge_name=desc,
+                        lane=lane,
+                        chargeable_weight_kg=weight,
+                        rate_billed=rate,
+                        amount_billed=amt,
+                        raw_line=line_str,
+                    )
+                )
+                continue
+
+            # Format 4: Caldrith PDF invoice line
             # USE2-INS2 CA51959332 Air freight 299 kg 5.69 1,701.31 19/05/2030
             m_cald = re.match(
                 r"^([A-Z0-9]+-[A-Z0-9]+)\s+([A-Z0-9\-]+)\s+(.+?)\s+([\d,]+\.\d{2})\s+([\d/\-]+)$", line_str
@@ -200,14 +273,12 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
                 amt = parse_money(m_cald.group(4)) or Decimal("0")
                 l_date = parse_date_str(m_cald.group(5)) or (inv_date or "")
 
-                # Middle: "Air freight 299 kg 5.69" or "Fuel surcharge 1,701.31 23.23%" or "Storage 5 days 59.33"
                 weight = None
                 rate = None
                 m_w = re.search(r"([\d.]+)\s*kg", middle)
                 if m_w:
                     weight = Decimal(m_w.group(1))
 
-                # Extract charge name by taking everything before the numbers/units
                 m_desc = re.match(
                     r"^(Air\s+freight|Fuel\s+surcharge|Security\s+surcharge|Storage|Delivery\s+fee|Dangerous\s+goods\s+fee|Dry\s+ice\s+handling\s+fee|Screening\s+fee|Hold\s+handling|Customs\s+hold\s+fee)",
                     middle,
@@ -234,8 +305,39 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
                 )
                 continue
 
-            # Format 3: XLSX Statement line
-            # Monthly account fee | 2034-11 | 1 month | 350.28 | 350.28
+            # Format 5: Late fee line
+            # Late fee on TX-US-2035-0233: USD 2002.93 overdue, month 1 @ 1.98% - - - 39.66 1 month 1.98%
+            # or 13 - - Late fee on TX-US-2032-5494: USD 680.12 overdue, month 1 @ 1.86% - 1 month 1.86% 12.65
+            if "Late fee on" in line_str or "Late payment fee" in line_str:
+                m_lf_amt = re.search(r"Late fee on\s+([A-Z0-9/\-]+):.*?\s+([\d,]+\.\d{2})\s+\d+\s+month", line_str)
+                if not m_lf_amt:
+                    m_lf_amt = re.search(r"Late fee on\s+([A-Z0-9/\-]+):.*?\s+([\d,]+\.\d{2})$", line_str)
+                if m_lf_amt:
+                    ref_inv = m_lf_amt.group(1).strip()
+                    amt = parse_money(m_lf_amt.group(2))
+                else:
+                    amt = parse_money(line_str.split()[-1])
+                    m_ref_inv = re.search(r"Late fee on\s+([A-Z0-9/\-]+)", line_str, re.I)
+                    ref_inv = m_ref_inv.group(1).strip() if m_ref_inv else ""
+
+                if amt is not None:
+                    lines.append(
+                        InvoiceLine(
+                            line_no=len(lines) + 1,
+                            awb=ref_inv,
+                            date_str=inv_date or "",
+                            charge_name="Late payment fee",
+                            lane="",
+                            chargeable_weight_kg=None,
+                            rate_billed=None,
+                            amount_billed=amt,
+                            raw_line=line_str,
+                            charge_code="LATE",
+                        )
+                    )
+                    continue
+
+            # Format 6: XLSX Statement line
             if "|" in line_str:
                 cells = [c.strip() for c in line_str.split("|")]
                 if len(cells) >= 4 and not cells[0].startswith("Charge") and not cells[0].startswith("Total"):
@@ -258,29 +360,6 @@ def parse_invoice(doc_path: str, pages: list[str], is_scan: bool = False) -> Opt
                             )
                         )
                         continue
-
-            # Format 4: Late fee line
-            # 13 - - Late fee on TX-US-2032-5494: USD 680.12 overdue, month 1 @ 1.86% - 1 month 1.86% 12.65
-            if "Late fee on" in line_str or "Late payment fee" in line_str:
-                amt = parse_money(line_str.split()[-1])
-                if amt is not None:
-                    m_ref_inv = re.search(r"Late fee on\s+([A-Z0-9/\-]+)", line_str, re.I)
-                    ref_inv = m_ref_inv.group(1).strip() if m_ref_inv else ""
-                    lines.append(
-                        InvoiceLine(
-                            line_no=len(lines) + 1,
-                            awb=ref_inv,
-                            date_str=inv_date or "",
-                            charge_name="Late payment fee",
-                            lane="",
-                            chargeable_weight_kg=None,
-                            rate_billed=None,
-                            amount_billed=amt,
-                            raw_line=line_str,
-                            charge_code="LATE",
-                        )
-                    )
-                    continue
 
     return InvoiceRecord(
         invoice_id=inv_id,

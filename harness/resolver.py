@@ -71,11 +71,19 @@ def is_authorized_contact(contract: ContractMeta, email: str, category: str) -> 
 
 def get_schedule1_holder(contract: ContractMeta, category: str) -> dict:
     """Get the Schedule 1 holder for a missing document category."""
+    # Check contacts_list for a carrier contact matching the category
+    for c in contract.contacts_list:
+        is_carrier = not (c.party and c.party.upper().startswith("QMP"))
+        if is_carrier and category.lower() in c.categories:
+            return {"party": c.party, "person": c.name, "role": c.title}
+
+    for c in contract.contacts_list:
+        if category.lower() in c.categories:
+            return {"party": c.party, "person": c.name, "role": c.title}
+
     c = contract.schedule1.get(category.lower())
     if not c:
-        # Fallback to Key Account Manager / notices
         c = contract.schedule1.get("notices")
     if c:
         return {"party": c.party, "person": c.name, "role": c.title}
-    # Default carrier holder
     return {"party": contract.carrier_party or "Carrier", "role": "Key Account Manager"}

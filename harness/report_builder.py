@@ -44,13 +44,17 @@ def build_report(
         tracking_events=tracking_events,
         feedback_facts=feedback,
         as_of=as_of,
+        documents=storage.data.get("documents", {}),
     )
     findings.extend(c1_findings)
 
     # Class 2: Duplicates
     c2_findings = audit_duplicates(
         invoices=invoices,
+        contracts=contracts,
+        ap_register=ap_register,
         credit_notes=credit_notes,
+        documents=storage.data.get("documents", {}),
         as_of=as_of,
     )
     findings.extend(c2_findings)

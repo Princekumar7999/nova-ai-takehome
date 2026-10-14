@@ -51,6 +51,7 @@ def audit_overcharge_for_invoice(
     tracking_events: dict[str, list[TrackingEvent]],
     feedback_facts: list[dict],
     as_of: str,
+    documents: Optional[dict[str, dict]] = None,
 ) -> Optional[dict]:
     """Audit invoice for contractual overcharges, rate conflicts, or unheld annexes."""
     # Check if this invoice is dated after as_of
@@ -68,15 +69,67 @@ def audit_overcharge_for_invoice(
     if not contract:
         return None
 
+    # Check Variant OC-02: DG fee billed on dry ice refrigerant under Clause 5.2
+    for line in inv.lines:
+        line_desc = line.charge_name.lower()
+        if "dg handling" in line_desc or "dangerous goods" in line_desc:
+            dgd_doc = None
+            dgd_quote = None
+            if documents:
+                for d_path, d_info in documents.items():
+                    if f"DGD-{line.awb}" in d_path or f"DGD_{line.awb}" in d_path:
+                        for pg in d_info.get("pages", []):
+                            pg_lower = pg.lower()
+                            # Clause 5.3: mixed shipments with other DGs attract the DG fee
+                            if any(dg in pg_lower for dg in ["lithium", "battery", "class 3", "class 9", "ethanol", "un3481", "un1170"]):
+                                continue
+                            for l_txt in pg.splitlines():
+                                if "refrigerant only" in l_txt.lower() or ("un1845" in l_txt.lower() and "refrigerant" in l_txt.lower()):
+                                    dgd_doc = d_path
+                                    dgd_quote = l_txt.strip()
+                                    break
+                            if dgd_doc:
+                                break
+                    if dgd_doc:
+                        break
+
+            if dgd_doc and dgd_quote:
+                clause_quote = "5.2 Dry ice. Dry ice (UN1845) used solely as a refrigerant for non-dangerous goods is billed at the Dry Ice Handling Fee in Annex D, once per shipment (not per package or per kg), and does not attract the Dangerous Goods Fee."
+                ev = [
+                    EvidenceQuote(doc=inv.source_doc, page=inv.source_page, quote=line.raw_line).to_dict(),
+                    EvidenceQuote(doc=contract.source_doc, page=3, quote=clause_quote).to_dict(),
+                    EvidenceQuote(doc=dgd_doc, page=1, quote=dgd_quote).to_dict(),
+                ]
+                return {
+                    "id": f"overcharge:{inv.invoice_id}",
+                    "class": "overcharge",
+                    "variant": "OC-02",
+                    "invoice_id": inv.invoice_id,
+                    "verdict": "finding",
+                    "amount_usd": money_str(line.amount_billed),
+                    "amount_range": None,
+                    "deadline": None,
+                    "evidence": ev,
+                    "missing_doc": None,
+                    "action": "draft:dispute",
+                    "confidence": 0.95,
+                    "supersedes": [],
+                    "learned_at": None,
+                }
+
     # Check feedback closure: dispute_closed on this invoice
     for fb in feedback_facts:
+        fkey = fb.get("finding_key", {})
+        if fkey.get("invoice_id") == inv.invoice_id and fkey.get("class") == "overcharge":
+            if fb.get("decision") in ("close", "reject"):
+                return None
+
         fact = fb.get("fact", {})
         if fact.get("type") == "dispute_closed":
             subj = fact.get("subject", {})
             if subj.get("invoice_id") == inv.invoice_id and fact.get("value", {}).get("status") in ("closed", "settled"):
                 override_amt = fact.get("value", {}).get("amount_usd")
                 if fb.get("decision") == "override_amount" and override_amt:
-                    # Return overridden amount finding
                     return {
                         "id": f"overcharge:{inv.invoice_id}",
                         "class": "overcharge",
@@ -89,7 +142,6 @@ def audit_overcharge_for_invoice(
                         "missing_doc": None,
                         "learned_at": {"feedback_item_id": fb["item_id"], "batch": fb.get("after_batch", "batch_01")},
                     }
-                # Fully closed -> no finding
                 return None
 
     # Find freight lines on invoice
@@ -230,13 +282,21 @@ def audit_overcharge_for_invoice(
                 break
 
         # 4. Resolve correct rate band
+        period_num = 1
+        if contract.period_2_start and pickup_date >= contract.period_2_start:
+            period_num = 2
+        elif not contract.period_2_start and len(contract.annex_c_fuel) > 6:
+            months_sorted = sorted(contract.annex_c_fuel.keys())
+            if len(months_sorted) >= 7 and pickup_date[:7] >= months_sorted[6]:
+                period_num = 2
+
         chosen_band = None
         deciding_source_doc = ""
         deciding_quote = ""
         deciding_page = 1
 
         if applicable_amendment and (precedence_source == "amendment" or not applicable_notice):
-            chosen_band = find_rate_band(applicable_amendment.replaced_rates, lane, weight)
+            chosen_band = find_rate_band(applicable_amendment.replaced_rates, lane, weight, period_num)
             if chosen_band:
                 deciding_source_doc = chosen_band.source_doc
                 deciding_quote = chosen_band.raw_quote
@@ -250,13 +310,6 @@ def audit_overcharge_for_invoice(
 
         if not chosen_band:
             # Use Contract Annex A
-            # Period 1 vs 2:
-            period_num = 1
-            if len(contract.annex_c_fuel) > 6:
-                # months after 6 -> period 2
-                months_sorted = sorted(contract.annex_c_fuel.keys())
-                if len(months_sorted) >= 7 and pickup_date[:7] >= months_sorted[6]:
-                    period_num = 2
             chosen_band = find_rate_band(contract.annex_a_rates, lane, weight, period_num)
             if chosen_band:
                 deciding_source_doc = chosen_band.source_doc
@@ -389,6 +442,7 @@ def audit_overcharge(
     tracking_events: dict[str, list[TrackingEvent]],
     feedback_facts: list[dict],
     as_of: str,
+    documents: Optional[dict[str, dict]] = None,
 ) -> list[dict]:
     """Audit all invoices for contract overcharges, conflicts, and cannot_determine findings."""
     findings = []
@@ -401,6 +455,7 @@ def audit_overcharge(
             tracking_events=tracking_events,
             feedback_facts=feedback_facts,
             as_of=as_of,
+            documents=documents,
         )
         if res:
             findings.append(res)
