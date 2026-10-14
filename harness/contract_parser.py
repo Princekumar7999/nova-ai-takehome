@@ -32,6 +32,8 @@ def parse_schedule1_line(line: str) -> Optional[Schedule1Contact]:
 def parse_msa(doc_path: str, pages: list[str]) -> Optional[ContractMeta]:
     """Parse full MSA contract document across its pages."""
     full_text = "\n".join(pages)
+    if "Amendment No." in full_text or "Amendment reference" in full_text or "AMD-" in doc_path or "-AMD" in doc_path:
+        return None
     if "Master Services Agreement" not in full_text and "MSA-" not in doc_path:
         return None
 
