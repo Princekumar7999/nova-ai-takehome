@@ -1,0 +1,81 @@
+{
+ "harness": "harness/harness.py",
+ "passed": 12,
+ "total": 12,
+ "your_cases": 10,
+ "score": 1.0,
+ "cases": [
+  {
+   "case": "01_overcharge_rate_band.yaml",
+   "name": "overcharge base rate exceeds contract annex a",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "02_overcharge_clean_control.yaml",
+   "name": "overcharge clean control minimum charge applies correctly",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "03_duplicate_cross_batch.yaml",
+   "name": "duplicate invoice reissued across batches",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "04_duplicate_paid_clean.yaml",
+   "name": "clean control non-duplicate new invoice",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "05_duplicate_credit_rebilled.yaml",
+   "name": "duplicate rebilled line after credit note",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "06_waived_authorized.yaml",
+   "name": "waived fee billed by carrier after written authorized waiver",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "07_waived_clean_control.yaml",
+   "name": "clean control expired or unrelated waiver",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "08_late_fee_grace_period.yaml",
+   "name": "late fee billed within grace period or paid on time",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "09_cashback_rebate_tier.yaml",
+   "name": "volume cashback rebate at correct tier",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "10_expiry_60_day_alert.yaml",
+   "name": "contract expiry alert 60 days before end date",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "sample_conflict.yaml",
+   "name": "amendment and rate notice disagree",
+   "pass": true,
+   "diff": []
+  },
+  {
+   "case": "sample_overcharge.yaml",
+   "name": "wrong rate on one freight line",
+   "pass": true,
+   "diff": []
+  }
+ ]
+}

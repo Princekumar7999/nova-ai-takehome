@@ -1,0 +1,10 @@
+name: overcharge clean control minimum charge applies correctly
+mailbox: data/examples/overcharge/docs
+as_of: '2032-08-31'
+mode: supervised
+expect:
+  key:
+    invoice_id: TX-US-2032-5397
+    class: overcharge
+  verdict: no_finding
+why: Shipment correctly billed at minimum charge under Clause 3.4

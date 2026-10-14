@@ -1,0 +1,12 @@
+name: overcharge base rate exceeds contract annex a
+mailbox: data/examples/overcharge/docs
+as_of: '2032-08-31'
+mode: supervised
+expect:
+  key:
+    invoice_id: TX-US-2032-5394
+    class: overcharge
+  verdict: finding
+  amount_usd: '196.92'
+  action: draft:dispute
+why: Billed freight rate 6.69 exceeds contract Annex A rate 6.01 for weight band 100-299.5 kg

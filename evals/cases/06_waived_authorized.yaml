@@ -1,0 +1,12 @@
+name: waived fee billed by carrier after written authorized waiver
+mailbox: data/examples/waived_but_billed/docs
+as_of: '2034-02-28'
+mode: supervised
+expect:
+  key:
+    invoice_id: TX-US-2033-5337
+    class: waived_but_billed
+  verdict: finding
+  amount_usd: '133.44'
+  action: draft:dispute
+why: Authorized Schedule 1 person waived fee in email but carrier billed it

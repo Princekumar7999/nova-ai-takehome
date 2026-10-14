@@ -1,0 +1,12 @@
+name: duplicate rebilled line after credit note
+mailbox: data/examples/duplicate_rebilled_4_months/docs
+as_of: '2032-08-31'
+mode: supervised
+expect:
+  key:
+    invoice_id: TX-US-2032-5441
+    class: duplicate
+  verdict: finding
+  amount_usd: '42.08'
+  action: draft:dispute
+why: Charge was previously credited by CN and cannot be rebilled

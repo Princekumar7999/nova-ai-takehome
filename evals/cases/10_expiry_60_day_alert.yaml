@@ -1,0 +1,10 @@
+name: contract expiry alert 60 days before end date
+mailbox: data/examples/expiry/docs
+as_of: '2034-02-28'
+mode: supervised
+expect:
+  key:
+    contract_id: TBX-US-EXP-E24
+    class: expiry
+  verdict: finding
+why: Contract end date is within the 60-day alert window and auto-renewal was not confirmed

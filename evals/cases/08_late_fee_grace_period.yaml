@@ -1,0 +1,12 @@
+name: late fee billed within grace period or paid on time
+mailbox: data/examples/late_fees/docs
+as_of: '2033-02-28'
+mode: supervised
+expect:
+  key:
+    invoice_id: TX-US-2032-5496
+    class: late_fee_not_owed
+  verdict: finding
+  amount_usd: '12.65'
+  action: draft:dispute
+why: Invoice was paid within due date grace period so late fee is not owed

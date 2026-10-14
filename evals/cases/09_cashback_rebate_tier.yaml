@@ -1,0 +1,12 @@
+name: volume cashback rebate at correct tier
+mailbox: data/examples/cashback/docs
+as_of: '2033-11-30'
+mode: supervised
+expect:
+  key:
+    contract_id: TBX-US-EXP-E58
+    class: cashback
+    period: '2033-Q2'
+    credit_type: rebate
+  verdict: finding
+why: Quarter qualifying spend reached the 5% tier; rebate credit note not issued within 45 days
