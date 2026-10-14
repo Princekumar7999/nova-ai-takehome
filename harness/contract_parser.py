@@ -90,19 +90,22 @@ def parse_msa(doc_path: str, pages: list[str]) -> Optional[ContractMeta]:
 
     # Late fee
     m_lf = re.search(
-        r"10\.2\s+Late payment fee\.\s+An overdue amount bears a monthly fee of\s+([\d.]+)%\s*\(([a-z]+)\)\s+from the due date[^.]*grace period of\s+(\d+)\s+days",
+        r"(10\.2\s+Late (?:payment )?fee\.\s+Undisputed amounts (?:unpaid|outstanding) (?:for|more than) (\d+) days (?:after|past) the due date (?:bear|incur) a late fee of ([\d.]+)% per month[^\n]*(?:\n[^\n]+){1,3})",
         full_text,
     )
     if m_lf:
-        lf_rate = Decimal(m_lf.group(1))
-        lf_compounds = "compound" in m_lf.group(2).lower()
-        lf_grace = int(m_lf.group(3))
-        lf_quote = m_lf.group(0)
+        lf_quote = m_lf.group(1).strip().replace("\n", " ")
+        if "10.3" in lf_quote:
+            lf_quote = lf_quote[: lf_quote.index("10.3")].strip()
+        lf_grace = int(m_lf.group(2))
+        lf_rate = Decimal(m_lf.group(3))
+        lf_compounds = "compounding" in full_text.lower()
     else:
+        m_lf_simple = re.search(r"10\.2\s+Late (?:payment )?fee\.[^\n]+", full_text)
+        lf_quote = m_lf_simple.group(0).strip() if m_lf_simple else ""
+        lf_grace = 5
         lf_rate = Decimal("1.86")
         lf_compounds = False
-        lf_grace = 5
-        lf_quote = ""
 
     # Volume rebate
     m_reb = re.search(r"7\.1\s+Volume rebate\.\s+([^\n]+(?:\n[^\n]+)?)", full_text)
