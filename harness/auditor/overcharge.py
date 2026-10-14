@@ -379,3 +379,30 @@ def audit_overcharge_for_invoice(
         res["learned_at"] = {"feedback_item_id": learned_feedback_id, "batch": learned_batch or "batch_02"}
 
     return res
+
+
+def audit_overcharge(
+    invoices: dict[str, InvoiceRecord],
+    contracts: dict[str, ContractMeta],
+    amendments: dict[str, AmendmentMeta],
+    rate_notices: list[RateNoticeRecord],
+    tracking_events: dict[str, list[TrackingEvent]],
+    feedback_facts: list[dict],
+    as_of: str,
+) -> list[dict]:
+    """Audit all invoices for contract overcharges, conflicts, and cannot_determine findings."""
+    findings = []
+    for inv in invoices.values():
+        res = audit_overcharge_for_invoice(
+            inv=inv,
+            contracts=contracts,
+            amendments=amendments,
+            rate_notices=rate_notices,
+            tracking_events=tracking_events,
+            feedback_facts=feedback_facts,
+            as_of=as_of,
+        )
+        if res:
+            findings.append(res)
+    return findings
+

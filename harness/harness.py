@@ -16,25 +16,45 @@ checks them. Replace the NotImplementedError bodies with your code.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from pathlib import Path
+
+# Ensure repo root is on sys.path and harness dir is removed from sys.path to avoid shadowing package
+ROOT = Path(__file__).resolve().parent.parent
+HERE = Path(__file__).resolve().parent
+while str(HERE) in sys.path:
+    sys.path.remove(str(HERE))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from harness.ingestion import IngestionPipeline
+from harness.report_builder import build_report
+from harness.storage import Storage
 
 DEFAULT_STATE = ".state"
 
 
 def ingest(batch_dir: str, state_dir: str) -> None:
-    raise NotImplementedError(
-        f"ingest is not written yet: read the .eml files in {batch_dir} and keep what you learn under {state_dir}")
+    pipeline = IngestionPipeline(state_dir)
+    pipeline.ingest_batch(batch_dir)
 
 
 def report(as_of: str, mode: str, state_dir: str) -> dict:
-    raise NotImplementedError(
-        f"report is not written yet: return the report.json dict for --as-of {as_of} in {mode} mode "
-        "(see grader/schema/report.schema.json and data/examples/*/expected_finding.json)")
+    storage = Storage(state_dir)
+    return build_report(storage, as_of=as_of, mode=mode)
 
 
 def feedback(feedback_file: str, state_dir: str) -> None:
-    raise NotImplementedError(
-        f"feedback is not written yet: store the decisions in {feedback_file} under {state_dir} so later reports use them")
+    storage = Storage(state_dir)
+    fb_path = Path(feedback_file)
+    if fb_path.is_file():
+        fb_data = json.loads(fb_path.read_text())
+        after_batch = fb_data.get("after_batch", "")
+        for item in fb_data.get("items", []):
+            item["after_batch"] = after_batch
+            storage.data["feedback"].append(item)
+        storage.save()
 
 
 def main(argv=None) -> int:
