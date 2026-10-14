@@ -51,12 +51,13 @@ def parse_msa(doc_path: str, pages: list[str]) -> Optional[ContractMeta]:
 
     # Initial term & End date
     m_term = re.search(
-        r"2\.2\s+Initial term\.\s+The initial term is\s+(\d+)\s+months,\s+ending on\s+(\d{4}-\d{2}-\d{2})", full_text
+        r"2\.2\s+Initial term\.\s+The initial term is\s+(\d+)\s+months,\s+ending on\s+(\d{4}-\d{2}-\d{2})\.?", full_text
     )
     if m_term:
         initial_months = int(m_term.group(1))
         end_date = m_term.group(2)
-        term_quote = m_term.group(0)
+        raw_tq = m_term.group(0).strip()
+        term_quote = raw_tq if raw_tq.endswith(".") else f"{raw_tq}."
     else:
         initial_months = 12
         end_date = "2035-12-31"
