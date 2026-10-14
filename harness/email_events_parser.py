@@ -31,38 +31,42 @@ def parse_email_events(
     full_text = f"Subject: {subject}\n\n{body}"
 
     # 1. Waivers
-    # "we waive the Delivery fee on AWB TE97049901"
-    # "We waive the Delivery fee on AWB TE33628218 in full."
-    # "We waive storage charges for the month of 2040-10"
-    m_w = re.search(r"(?:we\s+waive|waived)\s+(?:the\s+)?([A-Za-z\s]+?)\s+on\s+AWB\s+([A-Z0-9\-]+)", full_text, re.I)
-    if m_w:
-        charge = m_w.group(1).strip()
-        awb = m_w.group(2).strip()
-        quote = m_w.group(0)
-        is_quoted = bool(re.search(r"-----Original Message-----|wrote:|Forwarded message", body, re.I))
+    # Look for lines mentioning waive / waived
+    for line in full_text.splitlines():
+        line_s = line.strip()
+        if "waive" in line_s.lower():
+            m_awb = re.search(r"AWB\s+([A-Z0-9\-]+)", line_s, re.I)
+            if m_awb:
+                awb = m_awb.group(1).strip()
+                # Extract charge name
+                m_chg = re.search(r"(?:waive|treat|against)\s+(?:the\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+(?:fee|charge|surcharge))\b", line_s, re.I)
+                if not m_chg:
+                    m_chg = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+(?:fee|charge|surcharge))\b", line_s)
+                chg = m_chg.group(1).strip() if m_chg else "Delivery fee"
+                if chg.lower().startswith("the "):
+                    chg = chg[4:].strip()
 
-        # Find the line containing the waiver for exact citation quote
-        matched_line = ""
-        for line in full_text.splitlines():
-            if quote in line or (charge in line and awb in line):
-                matched_line = line.strip()
-                break
+                is_quoted = line_s.startswith(">")
+                if not is_quoted and "-----Original Message-----" in full_text:
+                    is_quoted = full_text.index("-----Original Message-----") < full_text.index(line_s)
+                if not is_quoted and "----- Forwarded message -----" in full_text:
+                    is_quoted = full_text.index("----- Forwarded message -----") < full_text.index(line_s)
 
-        waivers.append(
-            WaiverRecord(
-                sender_name=from_name,
-                sender_email=from_email.lower(),
-                date_str=date_day,
-                charge_name=charge,
-                awb=awb,
-                month=None,
-                condition=None,
-                source_doc=doc_path,
-                source_page=1,
-                raw_quote=matched_line or quote,
-                is_quoted_in_forward=is_quoted,
-            )
-        )
+                waivers.append(
+                    WaiverRecord(
+                        sender_name=from_name,
+                        sender_email=from_email.lower(),
+                        date_str=date_day,
+                        charge_name=chg,
+                        awb=awb,
+                        month=None,
+                        condition=None,
+                        source_doc=doc_path,
+                        source_page=1,
+                        raw_quote=line_s,
+                        is_quoted_in_forward=is_quoted,
+                    )
+                )
     else:
         # Waiver by month / condition
         m_wm = re.search(
